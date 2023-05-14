@@ -1,0 +1,83 @@
+
+import numpy as np 
+from scipy.integrate import odeint
+from qutip import *
+
+# Define the number of qubits
+N = 5
+
+# Define the Hamiltonian of the system
+H = 0
+for i in range(N):
+    H += sigmaz(i)
+
+# Define the initial state of the system
+psi0 = tensor(basis(2,0),basis(2,0),basis(2,0),basis(2,0),basis(2,0))
+
+# Define the time steps
+t = np.linspace(0,10,1000)
+
+# Define the interaction terms
+J = [[1,2],[2,3],[3,4],[4,5],[5,1]]
+
+# Define the coupling strength
+g = 0.1
+
+# Calculate the Hamiltonian
+def H_int(t,args):
+    H = 0
+    for i in range(N):
+        for j in J[i]:
+            H += g*sigmax(i)*sigmax(j)
+    return H
+
+# Calculate the time evolution of the system
+output = mesolve(H, psi0, t, [], [H_int], args)
+
+# Extract the wave function
+psi_t = output.states
+
+# Extract the 3D coordinates
+x, y, z = np.zeros((N, len(t)), dtype=float), np.zeros((N, len(t)), dtype=float), np.zeros((N, len(t)), dtype=float)
+for n in range(N):
+    x[n] = np.real(np.einsum('ij,ij->i',psi_t,sigmax(n)))
+    y[n] = np.real(np.einsum('ij,ij->i',psi_t,sigmay(n)))
+    z[n] = np.real(np.einsum('ij,ij->i',psi_t,sigmaz(n)))
+
+# Create the 3D game engine
+from panda3d.core import *
+
+# Load the 3D models
+modelList = []
+for i in range(N):
+    modelList.append(loader.loadModel("3DModel.egg"))
+
+# Set the positions of the models
+for i in range(N):
+    modelList[i].setPos(x[i],y[i],z[i])
+
+# Create the 3D world
+world = render.attachNewNode("World")
+
+# Add the models to the world
+for i in range(N):
+    modelList[i].reparentTo(world)
+
+# Create the 3D camera
+camera = base.makeCamera(world)
+
+# Set the position of the camera
+camera.setPos(0,0,0)
+
+# Set the camera to orthographic mode
+camera.node().getLens().setProjectionMatrixAsOrtho(-1,1,-1,1,-1000,1000)
+
+# Create the 3D lighting
+light = render.attachNewNode(DirectionalLight("Light"))
+light.node().setDirection(Vec3(0,0,1))
+
+# Add the lighting to the world
+light.reparentTo(world)
+
+# Run the 3D game engine
+base.run()
